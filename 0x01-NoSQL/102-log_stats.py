@@ -1,45 +1,32 @@
 #!/usr/bin/env python3
-""" MongoDB Operations with Python using pymongo """
+""" 12-log_stats module."""
+
+
+# import the mongo client
 from pymongo import MongoClient
 
-if __name__ == "__main__":
-    """ Provides some stats about Nginx logs stored in MongoDB """
-    client = MongoClient('mongodb://127.0.0.1:27017')
-    nginx_collection = client.logs.nginx
+# connect to the mongo client
+client = MongoClient('mongodb://localhost:27017/')
+# create a variable for the logs collection. This is the collection instance
+logs = client.logs.nginx
 
-    n_logs = nginx_collection.count_documents({})
-    print(f'{n_logs} logs')
 
-    methods = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+def get_logs_summary():
+    """Get logs summary."""
+
+    print(f'{logs.count_documents({})} logs')
     print('Methods:')
-    for method in methods:
-        count = nginx_collection.count_documents({"method": method})
-        print(f'\tmethod {method}: {count}')
+    print(f'\tmethod GET: {logs.count_documents({"method": "GET"})}')
+    print(f'\tmethod POST: {logs.count_documents({"method": "POST"})}')
+    print(f'\tmethod PUT: {logs.count_documents({"method": "PUT"})}')
+    print(f'\tmethod PATCH: {logs.count_documents({"method": "PATCH"})}')
+    print(f'\tmethod DELETE: {logs.count_documents({"method": "DELETE"})}')
+    print(f'{logs.count_documents({"path": "/status"})} status check')
+    print('IPs:')
+    for ip in logs.aggregate([{"$group": {"_id": "$ip", "count": {"$sum": 1}}}, {"$sort": {"count": -1}}, {"$limit": 10}]):
+        print(f'\t{ip.get("_id")}: {ip.get("count")}')
 
-    status_check = nginx_collection.count_documents(
-        {"method": "GET", "path": "/status"}
-    )
 
-    print(f'{status_check} status check')
-
-    top_ips = nginx_collection.aggregate([
-        {"$group":
-            {
-                "_id": "$ip",
-                "count": {"$sum": 1}
-            }
-         },
-        {"$sort": {"count": -1}},
-        {"$limit": 10},
-        {"$project": {
-            "_id": 0,
-            "ip": "$_id",
-            "count": 1
-        }}
-    ])
-
-    print("IPs:")
-    for top_ip in top_ips:
-        ip = top_ip.get("ip")
-        count = top_ip.get("count")
-        print(f'\t{ip}: {count}')
+if __name__ == '__main__':
+    get_logs_summary()
+client.close()
